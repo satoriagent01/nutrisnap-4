@@ -1,51 +1,122 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { useState } from 'react';
-import Layout from './components/Layout';
-import Dashboard from './pages/Dashboard';
-import Scanner from './pages/Scanner';
-import MealPlanner from './pages/MealPlanner';
-import History from './pages/History';
-import Settings from './pages/Settings';
+import { useState, useEffect } from 'react'
+import Header from './components/Header'
+import Camera from './components/Camera'
+import NutritionSummary from './components/NutritionSummary'
+import MealPlanner from './components/MealPlanner'
+import Dashboard from './components/Dashboard'
+import { loadProducts, loadMeals, loadGoals, saveProducts, saveMeals, saveGoals } from './utils/storage'
 
-export default function App() {
-  const [user, setUser] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('ns_user')) || null;
-    } catch {
-      return null;
+function App() {
+  const [activeTab, setActiveTab] = useState('dashboard')
+  const [products, setProducts] = useState([])
+  const [meals, setMeals] = useState([])
+  const [goals, setGoals] = useState({
+    calories: 2000,
+    protein: 50,
+    carbs: 250,
+    fat: 65,
+    fiber: 25,
+    sugar: 50,
+    sodium: 2300
+  })
+  const [editingProduct, setEditingProduct] = useState(null)
+
+  useEffect(() => {
+    const savedProducts = loadProducts()
+    const savedMeals = loadMeals()
+    const savedGoals = loadGoals()
+    if (savedProducts) setProducts(savedProducts)
+    if (savedMeals) setMeals(savedMeals)
+    if (savedGoals) setGoals(savedGoals)
+  }, [])
+
+  const handleProductSave = (product) => {
+    const updated = [...products]
+    const idx = updated.findIndex(p => p.id === product.id)
+    if (idx >= 0) {
+      updated[idx] = product
+    } else {
+      updated.push(product)
     }
-  });
+    setProducts(updated)
+    saveProducts(updated)
+    setActiveTab('dashboard')
+    setEditingProduct(null)
+  }
 
-  const saveUser = (u) => {
-    setUser(u);
-    localStorage.setItem('ns_user', JSON.stringify(u));
-  };
+  const handleProductDelete = (id) => {
+    const updated = products.filter(p => p.id !== id)
+    setProducts(updated)
+    saveProducts(updated)
+  }
+
+  const handleMealSave = (meal) => {
+    const updated = [...meals]
+    const idx = updated.findIndex(m => m.id === meal.id)
+    if (idx >= 0) {
+      updated[idx] = meal
+    } else {
+      updated.push(meal)
+    }
+    setMeals(updated)
+    saveMeals(updated)
+  }
+
+  const handleMealDelete = (id) => {
+    const updated = meals.filter(m => m.id !== id)
+    setMeals(updated)
+    saveMeals(updated)
+  }
+
+  const handleGoalsSave = (newGoals) => {
+    setGoals(newGoals)
+    saveGoals(newGoals)
+  }
+
+  const handleScanComplete = (product) => {
+    setEditingProduct(product)
+    setActiveTab('scan')
+  }
 
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Layout user={user} saveUser={saveUser} />} />
-        <Route
-          path="/dashboard"
-          element={user ? <Dashboard user={user} /> : <Navigate to="/" />}
-        />
-        <Route
-          path="/scanner"
-          element={user ? <Scanner user={user} /> : <Navigate to="/" />}
-        />
-        <Route
-          path="/meal-planner"
-          element={user ? <MealPlanner user={user} /> : <Navigate to="/" />}
-        />
-        <Route
-          path="/history"
-          element={user ? <History user={user} /> : <Navigate to="/" />}
-        />
-        <Route
-          path="/settings"
-          element={user ? <Settings user={user} saveUser={saveUser} /> : <Navigate to="/" />}
-        />
-      </Routes>
-    </BrowserRouter>
-  );
+    <div className="min-h-screen bg-light">
+      <Header activeTab={activeTab} setActiveTab={setActiveTab} />
+      <main className="max-w-4xl mx-auto px-4 py-6">
+        {activeTab === 'dashboard' && (
+          <Dashboard
+            products={products}
+            meals={meals}
+            goals={goals}
+            onProductDelete={handleProductDelete}
+            onMealDelete={handleMealDelete}
+            onScanNew={() => setActiveTab('scan')}
+          />
+        )}
+        {activeTab === 'scan' && (
+          <Camera
+            onScanComplete={handleScanComplete}
+            existingProducts={products}
+          />
+        )}
+        {activeTab === 'edit' && editingProduct && (
+          <NutritionSummary
+            product={editingProduct}
+            onSave={handleProductSave}
+            onCancel={() => { setActiveTab('dashboard'); setEditingProduct(null); }}
+          />
+        )}
+        {activeTab === 'meals' && (
+          <MealPlanner
+            products={products}
+            meals={meals}
+            goals={goals}
+            onSaveMeal={handleMealSave}
+            onDeleteMeal={handleMealDelete}
+          />
+        )}
+      </main>
+    </div>
+  )
 }
+
+export default App
