@@ -1,1 +1,1 @@
-[written: 26 characters]
+[written: 24 characters]
